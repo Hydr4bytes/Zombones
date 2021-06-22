@@ -5,7 +5,9 @@ using System.Collections.Generic;
 
 using MelonLoader;
 using UnityEngine;
-using ModThatIsNotMod;
+using ModThatIsNotMod.BoneMenu;
+
+using StressLevelZero.Zones;
 
 namespace Zombones
 {
@@ -20,18 +22,29 @@ namespace Zombones
 
     public class Zombones : MelonMod
     {
-        public float RoundTime;
-        public float SpawnTime;
-
-        private float RoundTimer = 0f;
-        private float SpawnTimer = 0f;
+        private float WaveTime;
+        private float WaveTimer = 0f;
         private int CurrentRound = 0;
 
-        public bool MapIsZombieMap = false;
+        public float SpawnFrequencyMultiplier = 1.1f;
+
+        public static bool MapIsZombieMap = false;
+        public static bool GameStarted = false;
 
         public override void OnApplicationStart()
         {
             CustomMaps.CustomMaps.OnCustomMapLoad += CustomMaps_OnCustomMapLoad;
+
+            MenuCategory ZombonesCategory = MenuManager.CreateCategory(BuildInfo.Name, Color.green);
+            ZombonesCategory.CreateFunctionElement("Start Game", Color.white, () => {
+                if (!MapIsZombieMap) return;
+            });
+        }
+
+        public override void OnSceneWasUnloaded(int buildIndex, string sceneName)
+        {
+            MapIsZombieMap = false;
+            GameStarted = false;
         }
 
         private void CustomMaps_OnCustomMapLoad(string name)
@@ -42,14 +55,14 @@ namespace Zombones
             if(MapIsZombieMap)
             {
                 Transform Manager = FindZombieManager().transform;
-                if (Manager.Find("RoundTime") != null)
+                if (Manager.Find("WaveTime") != null)
                 {
-                    RoundTime = float.Parse(Manager.Find("RoundTime").GetChild(0).name);
+                    WaveTime = float.Parse(Manager.Find("WaveTime").GetChild(0).name);
                 }
 
-                if (Manager.Find("SpawnTime") != null)
+                if (Manager.Find("SpawnFrequencyMultiplier") != null)
                 {
-                    SpawnTime = float.Parse(Manager.Find("SpawnTime").GetChild(0).name);
+                    SpawnFrequencyMultiplier = float.Parse(Manager.Find("SpawnFrequencyMultiplier").GetChild(0).name);
                 }
 
                 UIWatch.MakeUI();
@@ -58,34 +71,40 @@ namespace Zombones
 
         public override void OnUpdate()
         {
-            if (MapIsZombieMap)
+            if (MapIsZombieMap && GameStarted)
             {
-                RoundTimer += Time.deltaTime;
-                SpawnTimer += Time.deltaTime;
+                WaveTimer += Time.deltaTime;
 
-                UIWatch.SetText($"Wave:{CurrentRound}\n{Math.Round(RoundTime -RoundTimer, 1)}\n{Math.Round(SpawnTime-SpawnTimer, 1)}");
+                UIWatch.SetText($"Wave:{CurrentRound}\n{Math.Round(WaveTime-WaveTimer, 1)}");
 
-                if (RoundTimer > RoundTime)
+                if (WaveTimer > WaveTime)
                 {
-                    RoundTimer = 0f;
+                    WaveTimer = 0f;
                     CurrentRound++;
-                    UIWatch.Haptic(1);
-                    SpawnTime *= 0.9f;
-                }
-
-                if (SpawnTimer > SpawnTime)
-                {
-                    SpawnTimer = 0f;
-                    MelonLogger.Msg($"Spawning from {FindZombieSpawners().Count} Spawners");
-                    foreach (GameObject gameObject in FindZombieSpawners())
+                    UIWatch.Haptic(10);
+                    foreach(ZoneSpawner spawner in FindZombieSpawners())
                     {
-                        CustomItems.SpawnFromPool(gameObject.transform.GetChild(0).name, gameObject.transform.position, gameObject.transform.rotation);
+                        spawner.frequency *= SpawnFrequencyMultiplier;
                     }
                 }
             }
         }
 
-        private GameObject FindZombieManager()
+        internal static bool TryStartGame()
+        {
+            if (MapIsZombieMap) {
+                foreach(ZoneSpawner spawner in FindZombieSpawners())
+                {
+                    spawner.AllowSpawning(true);
+                }
+                UIWatch.Haptic(10);
+                GameStarted = true;
+                return true;
+            }
+            return false;
+        }
+
+        internal static GameObject FindZombieManager()
         {
             foreach(GameObject gameObject in GameObject.FindObjectsOfType<GameObject>())
             {
@@ -97,9 +116,9 @@ namespace Zombones
             return null;
         }
 
-        private List<GameObject> FindZombieSpawners()
+        internal static List<ZoneSpawner> FindZombieSpawners()
         {
-            return GameObject.FindObjectsOfType<GameObject>().Where(obj => obj.name.Contains("ZombieSpawner")).ToList();
+            return GameObject.FindObjectsOfType<ZoneSpawner>().ToList();
         }
     }
 }
