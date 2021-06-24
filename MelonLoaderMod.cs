@@ -5,9 +5,11 @@ using System.Collections.Generic;
 
 using MelonLoader;
 using UnityEngine;
+using ModThatIsNotMod;
 using ModThatIsNotMod.BoneMenu;
 
 using StressLevelZero.Zones;
+using StressLevelZero.AI;
 
 namespace Zombones
 {
@@ -24,27 +26,24 @@ namespace Zombones
     {
         private float WaveTime;
         private float WaveTimer = 0f;
-        private int CurrentRound = 0;
+        private int CurrentWave = 0;
 
         public float SpawnFrequencyMultiplier = 1.1f;
 
-        public static bool MapIsZombieMap = false;
-        public static bool GameStarted = false;
+        internal static bool MapIsZombieMap = false;
+        internal static bool GameStarted = false;
+
+        internal static MenuCategory ZombonesCategory;
 
         public override void OnApplicationStart()
         {
             CustomMaps.CustomMaps.OnCustomMapLoad += CustomMaps_OnCustomMapLoad;
 
-            MenuCategory ZombonesCategory = MenuManager.CreateCategory(BuildInfo.Name, Color.green);
+            ZombonesCategory = MenuManager.CreateCategory(BuildInfo.Name, Color.green);
             ZombonesCategory.CreateFunctionElement("Start Game", Color.white, () => {
-                if (!MapIsZombieMap) return;
+                TryStartGame();
             });
-        }
 
-        public override void OnSceneWasUnloaded(int buildIndex, string sceneName)
-        {
-            MapIsZombieMap = false;
-            GameStarted = false;
         }
 
         private void CustomMaps_OnCustomMapLoad(string name)
@@ -65,6 +64,24 @@ namespace Zombones
                     SpawnFrequencyMultiplier = float.Parse(Manager.Find("SpawnFrequencyMultiplier").GetChild(0).name);
                 }
 
+                foreach (ZoneSpawner spawner in FindZombieSpawners())
+                {
+                    spawner.OnSpawnDelegate = (Action<GameObject, GameObject>)((GameObject a, GameObject b) =>
+                    {
+                        if(a.gameObject.GetComponent<AIBrain>() != null)
+                        {
+                            a.gameObject.GetComponent<AIBrain>().behaviour.breakAgroTargetDistance = float.PositiveInfinity;
+                            a.gameObject.GetComponent<AIBrain>().behaviour.SetAgro(Player.rightHand.triggerRefProxy);
+                        }
+
+                        if (b.gameObject.GetComponent<AIBrain>() != null)
+                        {
+                            b.gameObject.GetComponent<AIBrain>().behaviour.breakAgroTargetDistance = float.PositiveInfinity;
+                            b.gameObject.GetComponent<AIBrain>().behaviour.SetAgro(Player.rightHand.triggerRefProxy);
+                        }
+                    });
+                }
+
                 UIWatch.MakeUI();
             }
         }
@@ -75,12 +92,13 @@ namespace Zombones
             {
                 WaveTimer += Time.deltaTime;
 
-                UIWatch.SetText($"Wave:{CurrentRound}\n{Math.Round(WaveTime-WaveTimer, 1)}");
+                TimeSpan time = TimeSpan.FromSeconds(WaveTime - WaveTimer);
+                UIWatch.SetText($"Wave:{CurrentWave}\n{time.Minutes}:{time.Seconds}");
 
                 if (WaveTimer > WaveTime)
                 {
                     WaveTimer = 0f;
-                    CurrentRound++;
+                    CurrentWave++;
                     UIWatch.Haptic(10);
                     foreach(ZoneSpawner spawner in FindZombieSpawners())
                     {
@@ -93,12 +111,12 @@ namespace Zombones
         internal static bool TryStartGame()
         {
             if (MapIsZombieMap) {
-                foreach(ZoneSpawner spawner in FindZombieSpawners())
-                {
-                    spawner.AllowSpawning(true);
-                }
-                UIWatch.Haptic(10);
                 GameStarted = true;
+                UIWatch.Haptic(10);
+                foreach (ZoneSpawner spawner in FindZombieSpawners())
+                {
+                    spawner.StartSpawn();
+                }
                 return true;
             }
             return false;

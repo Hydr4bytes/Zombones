@@ -23,19 +23,20 @@ namespace Zombones
 
             Transform TextTransform = new GameObject().transform;
             TextTransform.parent = UIObj.transform;
+            TextTransform.localPosition = new Vector3(0f, 0f, 0.01f);
 
             Transform BorderTransform = new GameObject().transform;
             BorderTransform.parent = UIObj.transform;
 
             Text = TextTransform.gameObject.AddComponent<TextMeshPro>();
-            Text.text = "Text";
+            Text.text = $"{BuildInfo.Name}\n{BuildInfo.Version}";
             Text.fontSize = 2f;
             Text.alignment = TextAlignmentOptions.Center;
             Text.fontStyle = FontStyles.Bold;
 
             Border = BorderTransform.gameObject.AddComponent<TextMeshPro>();
             Border.text = "[  ]";
-            Border.fontSize = 10f;
+            Border.fontSize = 11f;
             Border.alignment = TextAlignmentOptions.Center;
             Border.overflowMode = 0;
             Border.color = Color.red;
