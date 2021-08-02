@@ -36,7 +36,7 @@ namespace Zombones
 
             Border = BorderTransform.gameObject.AddComponent<TextMeshPro>();
             Border.text = "[  ]";
-            Border.fontSize = 11f;
+            Border.fontSize = 12f;
             Border.alignment = TextAlignmentOptions.Center;
             Border.overflowMode = 0;
             Border.color = Color.red;

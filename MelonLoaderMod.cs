@@ -10,6 +10,8 @@ using ModThatIsNotMod.BoneMenu;
 
 using StressLevelZero.Zones;
 using StressLevelZero.AI;
+using StressLevelZero.Props.Weapons;
+using StressLevelZero.Player;
 
 namespace Zombones
 {
@@ -24,60 +26,54 @@ namespace Zombones
 
     public class Zombones : MelonMod
     {
-        private float WaveTime;
         private float WaveTimer = 0f;
         private int CurrentWave = 0;
 
-        public float SpawnFrequencyMultiplier = 1.1f;
+        internal static Utils.ManagerData ManagerData;
 
         internal static bool MapIsZombieMap = false;
         internal static bool GameStarted = false;
+        internal static Gamemode CurrentGamemode;
 
-        internal static MenuCategory ZombonesCategory;
+        internal static List<Gamemode> Gamemodes = new List<Gamemode>(); 
 
         public override void OnApplicationStart()
         {
             CustomMaps.CustomMaps.OnCustomMapLoad += CustomMaps_OnCustomMapLoad;
 
-            ZombonesCategory = MenuManager.CreateCategory(BuildInfo.Name, Color.green);
-            ZombonesCategory.CreateFunctionElement("Start Game", Color.white, () => {
-                TryStartGame();
-            });
+            Gamemodes.Add(new Endless());
 
+            MenuCategory ZombonesCategory = MenuManager.CreateCategory(BuildInfo.Name, Color.green);
+            MenuCategory SubCategory = ZombonesCategory.CreateSubCategory("Start Game", Color.white);
+            foreach (Gamemode gamemode in Gamemodes)
+            {
+                SubCategory.CreateFunctionElement(gamemode.Name, Color.white, () => {
+                    TryStartGame(gamemode);
+                    MelonLogger.Msg("Starting " + gamemode.Name);
+                });
+            }
         }
 
         private void CustomMaps_OnCustomMapLoad(string name)
         {
-            MapIsZombieMap = FindZombieManager() != null;
+            MapIsZombieMap = Utils.FindZombieManagerGameObject() != null;
             MelonLogger.Msg(MapIsZombieMap ? "Map is a zombie map" : "Map is not a zombie map");
 
             if(MapIsZombieMap)
             {
-                Transform Manager = FindZombieManager().transform;
-                if (Manager.Find("WaveTime") != null)
-                {
-                    WaveTime = float.Parse(Manager.Find("WaveTime").GetChild(0).name);
-                }
+                ManagerData = Utils.GetZombieManagerData();
 
-                if (Manager.Find("SpawnFrequencyMultiplier") != null)
-                {
-                    SpawnFrequencyMultiplier = float.Parse(Manager.Find("SpawnFrequencyMultiplier").GetChild(0).name);
-                }
-
-                foreach (ZoneSpawner spawner in FindZombieSpawners())
+                foreach (ZoneSpawner spawner in Utils.FindZombieSpawners())
                 {
                     spawner.OnSpawnDelegate = (Action<GameObject, GameObject>)((GameObject a, GameObject b) =>
                     {
                         if(a.gameObject.GetComponent<AIBrain>() != null)
                         {
-                            a.gameObject.GetComponent<AIBrain>().behaviour.breakAgroTargetDistance = float.PositiveInfinity;
-                            a.gameObject.GetComponent<AIBrain>().behaviour.SetAgro(Player.rightHand.triggerRefProxy);
+                            CurrentGamemode.OnSpawn(a.gameObject.GetComponent<AIBrain>());
                         }
-
-                        if (b.gameObject.GetComponent<AIBrain>() != null)
+                        else if (b.gameObject.GetComponent<AIBrain>() != null)
                         {
-                            b.gameObject.GetComponent<AIBrain>().behaviour.breakAgroTargetDistance = float.PositiveInfinity;
-                            b.gameObject.GetComponent<AIBrain>().behaviour.SetAgro(Player.rightHand.triggerRefProxy);
+                            CurrentGamemode.OnSpawn(b.gameObject.GetComponent<AIBrain>());
                         }
                     });
                 }
@@ -86,57 +82,51 @@ namespace Zombones
             }
         }
 
-        public override void OnUpdate()
+        internal IEnumerator MainLoop()
         {
-            if (MapIsZombieMap && GameStarted)
+            while(MapIsZombieMap && GameStarted)
             {
                 WaveTimer += Time.deltaTime;
 
-                TimeSpan time = TimeSpan.FromSeconds(WaveTime - WaveTimer);
-                UIWatch.SetText($"Wave:{CurrentWave}\n{time.Minutes}:{time.Seconds}");
+                TimeSpan time = TimeSpan.FromSeconds(ManagerData.WaveTime - WaveTimer);
+                UIWatch.SetText($"Wave:{CurrentWave}\n{time.ToString(@"m\:ss")}");
 
-                if (WaveTimer > WaveTime)
+                if (WaveTimer > ManagerData.WaveTime && CurrentGamemode.CanAdvance())
                 {
                     WaveTimer = 0f;
                     CurrentWave++;
-                    UIWatch.Haptic(10);
-                    foreach(ZoneSpawner spawner in FindZombieSpawners())
-                    {
-                        spawner.frequency *= SpawnFrequencyMultiplier;
-                    }
+                    CurrentGamemode.OnCooldown();
+                    UIWatch.SetText($"Cooldown");
+                    GiveAmmo(CurrentGamemode.SmallAmmoReward(), CurrentGamemode.MediumAmmoReward());
+                    yield return new WaitForSeconds(ManagerData.CooldownTime);
+                    CurrentGamemode.OnNewWave();
                 }
+
+                yield return null;
             }
         }
 
-        internal static bool TryStartGame()
+        internal bool TryStartGame(Gamemode gamemode)
         {
             if (MapIsZombieMap) {
                 GameStarted = true;
                 UIWatch.Haptic(10);
-                foreach (ZoneSpawner spawner in FindZombieSpawners())
+                foreach (ZoneSpawner spawner in Utils.FindZombieSpawners())
                 {
                     spawner.StartSpawn();
                 }
+                CurrentGamemode = gamemode;
+                MelonCoroutines.Start(MainLoop());
                 return true;
             }
             return false;
         }
 
-        internal static GameObject FindZombieManager()
+        internal static void GiveAmmo(float small, float medium)
         {
-            foreach(GameObject gameObject in GameObject.FindObjectsOfType<GameObject>())
-            {
-                if(gameObject.name.Contains("ZombieManager"))
-                {
-                    return gameObject;
-                }
-            }
-            return null;
-        }
-
-        internal static List<ZoneSpawner> FindZombieSpawners()
-        {
-            return GameObject.FindObjectsOfType<ZoneSpawner>().ToList();
+            PlayerInventory inventory = GameObject.FindObjectOfType<PlayerInventory>();
+            inventory.AddAmmo(StressLevelZero.Combat.Weight.LIGHT, (int)small);
+            inventory.AddAmmo(StressLevelZero.Combat.Weight.MEDIUM, (int)medium);
         }
     }
 }

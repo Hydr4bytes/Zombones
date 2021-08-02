@@ -37,9 +37,6 @@
     <Reference Include="Assembly-CSharp">
       <HintPath>F:\SteamLibrary\steamapps\common\BONEWORKS\BONEWORKS\MelonLoader\Managed\Assembly-CSharp.dll</HintPath>
     </Reference>
-    <Reference Include="BoneworksModdingToolkit">
-      <HintPath>F:\SteamLibrary\steamapps\common\BONEWORKS\BONEWORKS\Mods\BoneworksModdingToolkit.dll</HintPath>
-    </Reference>
     <Reference Include="CustomMaps">
       <HintPath>F:\SteamLibrary\steamapps\common\BONEWORKS\BONEWORKS\Mods\CustomMaps.dll</HintPath>
     </Reference>
@@ -75,9 +72,11 @@
     <Reference Include="UnityEngine.UI, Version=3.7.1.6, Culture=neutral, PublicKeyToken=null" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Gamemode.cs" />
     <Compile Include="MelonLoaderMod.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="UI.cs" />
+    <Compile Include="Utils.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Resources\notif.wav" />
