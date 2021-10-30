@@ -47,6 +47,7 @@ namespace Zombones
             foreach (ZoneSpawner spawner in Utils.FindZombieSpawners())
             {
                 spawner.frequency *= Zombones.ManagerData.SpawnFrequencyMultiplier;
+                spawner.concurrentAlive *= (int)Zombones.ManagerData.SpawnFrequencyMultiplier;
             }
 
             foreach (GameObject gameObject in GetZombieCooldownObjects())
